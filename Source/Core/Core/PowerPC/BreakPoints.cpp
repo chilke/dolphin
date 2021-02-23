@@ -65,12 +65,13 @@ void BreakPoints::AddFromStrings(const TBreakPointsStr& bp_strings)
   for (const std::string& bp_string : bp_strings)
   {
     TBreakPoint bp;
-    std::stringstream ss;
-    ss << std::hex << bp_string;
-    ss >> bp.address;
-    bp.is_enabled = bp_string.find('n') != bp_string.npos;
-    bp.log_on_hit = bp_string.find('l') != bp_string.npos;
-    bp.break_on_hit = bp_string.find('b') != bp_string.npos;
+    std::string flags;
+    std::istringstream iss(bp_string);
+    iss >> std::hex >> bp.address;
+    iss >> flags;
+    bp.is_enabled = flags.find('n') != flags.npos;
+    bp.log_on_hit = flags.find('l') != flags.npos;
+    bp.break_on_hit = flags.find('b') != flags.npos;
     bp.is_temporary = false;
     Add(bp);
   }
@@ -158,7 +159,7 @@ MemChecks::TMemChecksStr MemChecks::GetStrings() const
     ss << " " << (mc.is_ranged ? mc.end_address : mc.start_address) << " "
        << (mc.is_ranged ? "n" : "") << (mc.is_break_on_read ? "r" : "")
        << (mc.is_break_on_write ? "w" : "") << (mc.log_on_hit ? "l" : "")
-       << (mc.break_on_hit ? "p" : "");
+       << (mc.break_on_hit ? "b" : "");
     mc_strings.push_back(ss.str());
   }
 

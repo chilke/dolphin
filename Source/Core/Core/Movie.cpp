@@ -25,9 +25,9 @@
 #include "Common/ChunkFile.h"
 #include "Common/CommonPaths.h"
 #include "Common/Config/Config.h"
-#include "Common/File.h"
 #include "Common/FileUtil.h"
 #include "Common/Hash.h"
+#include "Common/IOFile.h"
 #include "Common/MsgHandler.h"
 #include "Common/NandPaths.h"
 #include "Common/StringUtil.h"
@@ -470,7 +470,7 @@ void ChangeWiiPads(bool instantly)
     return;
 
   const auto ios = IOS::HLE::GetIOS();
-  const auto bt = ios ? std::static_pointer_cast<IOS::HLE::Device::BluetoothEmu>(
+  const auto bt = ios ? std::static_pointer_cast<IOS::HLE::BluetoothEmuDevice>(
                             ios->GetDeviceByName("/dev/usb/oh1/57e/305")) :
                         nullptr;
   for (int i = 0; i < MAX_WIIMOTES; ++i)

@@ -9,7 +9,7 @@
 
 #include <QApplication>
 #include <QPushButton>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QString>
 #include <QTimer>
 
@@ -51,8 +51,10 @@ QString GetExpressionForControl(const QString& control_name,
 
   if (quote == Quote::On)
   {
-    QRegExp reg(QStringLiteral("[a-zA-Z]+"));
-    if (!reg.exactMatch(expr))
+    // If our expression contains any non-alpha characters
+    // we should quote it
+    const QRegularExpression reg(QStringLiteral("[^a-zA-Z]"));
+    if (reg.match(expr).hasMatch())
       expr = QStringLiteral("`%1`").arg(expr);
   }
 
@@ -85,6 +87,8 @@ QString DetectExpression(QPushButton* button, ciface::Core::DeviceContainer& dev
   RemoveSpuriousTriggerCombinations(&detections);
 
   const auto timer = new QTimer(button);
+
+  timer->setSingleShot(true);
 
   button->connect(timer, &QTimer::timeout, [button, filter] {
     button->releaseMouse();

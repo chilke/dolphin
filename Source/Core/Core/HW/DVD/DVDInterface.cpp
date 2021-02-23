@@ -18,10 +18,10 @@
 #include "Common/Config/Config.h"
 #include "Common/Logging/Log.h"
 
-#include "Core/Analytics.h"
 #include "Core/Config/MainSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/CoreTiming.h"
+#include "Core/DolphinAnalytics.h"
 #include "Core/HW/AudioInterface.h"
 #include "Core/HW/DVD/DVDMath.h"
 #include "Core/HW/DVD/DVDThread.h"
@@ -561,8 +561,7 @@ bool UpdateRunningGameMetadata(std::optional<u64> title_id)
   if (!DVDThread::HasDisc())
     return false;
 
-  return DVDThread::UpdateRunningGameMetadata(IOS::HLE::Device::DI::GetCurrentPartition(),
-                                              title_id);
+  return DVDThread::UpdateRunningGameMetadata(IOS::HLE::DIDevice::GetCurrentPartition(), title_id);
 }
 
 void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
@@ -1312,7 +1311,7 @@ void FinishExecutingCommand(ReplyType reply_type, DIInterruptType interrupt_type
 
   case ReplyType::IOS:
   {
-    IOS::HLE::Device::DI::InterruptFromDVDInterface(interrupt_type);
+    IOS::HLE::DIDevice::InterruptFromDVDInterface(interrupt_type);
     break;
   }
 

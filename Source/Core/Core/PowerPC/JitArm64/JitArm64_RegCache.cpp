@@ -41,8 +41,20 @@ ARM64Reg Arm64RegCache::GetReg()
   // Holy cow, how did you run out of registers?
   // We can't return anything reasonable in this case. Return INVALID_REG and watch the failure
   // happen
-  WARN_LOG_FMT(DYNA_REC, "All available registers are locked dumb dumb");
+  ASSERT_MSG(DYNA_REC, 0, "All available registers are locked!");
   return INVALID_REG;
+}
+
+void Arm64RegCache::UpdateLastUsed(BitSet32 regs_used)
+{
+  for (size_t i = 0; i < m_guest_registers.size(); ++i)
+  {
+    OpArg& reg = m_guest_registers[i];
+    if (i < 32 && regs_used[i])
+      reg.ResetLastUsed();
+    else
+      reg.IncrementLastUsed();
+  }
 }
 
 u32 Arm64RegCache::GetUnlockedRegisterCount() const
@@ -135,13 +147,13 @@ const OpArg& Arm64GPRCache::GetGuestGPROpArg(size_t preg) const
 Arm64GPRCache::GuestRegInfo Arm64GPRCache::GetGuestGPR(size_t preg)
 {
   ASSERT(preg < GUEST_GPR_COUNT);
-  return {32, PPCSTATE_OFF(gpr[preg]), m_guest_registers[GUEST_GPR_OFFSET + preg]};
+  return {32, PPCSTATE_OFF_GPR(preg), m_guest_registers[GUEST_GPR_OFFSET + preg]};
 }
 
 Arm64GPRCache::GuestRegInfo Arm64GPRCache::GetGuestCR(size_t preg)
 {
   ASSERT(preg < GUEST_CR_COUNT);
-  return {64, PPCSTATE_OFF(cr.fields[preg]), m_guest_registers[GUEST_CR_OFFSET + preg]};
+  return {64, PPCSTATE_OFF_CR(preg), m_guest_registers[GUEST_CR_OFFSET + preg]};
 }
 
 Arm64GPRCache::GuestRegInfo Arm64GPRCache::GetGuestByIndex(size_t index)
@@ -208,19 +220,22 @@ void Arm64GPRCache::FlushRegisters(BitSet32 regs, bool maintain_state)
         if (reg1.IsDirty() && reg2.IsDirty() && reg1.GetType() == RegType::Register &&
             reg2.GetType() == RegType::Register)
         {
-          size_t ppc_offset = GetGuestByIndex(i).ppc_offset;
-          ARM64Reg RX1 = R(GetGuestByIndex(i));
-          ARM64Reg RX2 = R(GetGuestByIndex(i + 1));
-          m_emit->STP(IndexType::Signed, RX1, RX2, PPC_REG, u32(ppc_offset));
-          if (!maintain_state)
+          const size_t ppc_offset = GetGuestByIndex(i).ppc_offset;
+          if (ppc_offset <= 252)
           {
-            UnlockRegister(DecodeReg(RX1));
-            UnlockRegister(DecodeReg(RX2));
-            reg1.Flush();
-            reg2.Flush();
+            ARM64Reg RX1 = R(GetGuestByIndex(i));
+            ARM64Reg RX2 = R(GetGuestByIndex(i + 1));
+            m_emit->STP(IndexType::Signed, RX1, RX2, PPC_REG, u32(ppc_offset));
+            if (!maintain_state)
+            {
+              UnlockRegister(DecodeReg(RX1));
+              UnlockRegister(DecodeReg(RX2));
+              reg1.Flush();
+              reg2.Flush();
+            }
+            ++i;
+            continue;
           }
-          ++i;
-          continue;
         }
       }
 
@@ -442,7 +457,7 @@ ARM64Reg Arm64FPRCache::R(size_t preg, RegType type)
       // Load the high 64bits from the file and insert them in to the high 64bits of the host
       // register
       const ARM64Reg tmp_reg = GetReg();
-      m_float_emit->LDR(64, IndexType::Unsigned, tmp_reg, PPC_REG, u32(PPCSTATE_OFF(ps[preg].ps1)));
+      m_float_emit->LDR(64, IndexType::Unsigned, tmp_reg, PPC_REG, u32(PPCSTATE_OFF_PS1(preg)));
       m_float_emit->INS(64, host_reg, 1, tmp_reg, 0);
       UnlockRegister(tmp_reg);
 
@@ -496,7 +511,7 @@ ARM64Reg Arm64FPRCache::R(size_t preg, RegType type)
     }
     reg.SetDirty(false);
     m_float_emit->LDR(load_size, IndexType::Unsigned, host_reg, PPC_REG,
-                      u32(PPCSTATE_OFF(ps[preg].ps0)));
+                      u32(PPCSTATE_OFF_PS0(preg)));
     return host_reg;
   }
   default:
@@ -544,8 +559,7 @@ ARM64Reg Arm64FPRCache::RW(size_t preg, RegType type)
       // We are doing a full 128bit store because it takes 2 cycles on a Cortex-A57 to do a 128bit
       // store.
       // It would take longer to do an insert to a temporary and a 64bit store than to just do this.
-      m_float_emit->STR(128, IndexType::Unsigned, flush_reg, PPC_REG,
-                        u32(PPCSTATE_OFF(ps[preg].ps0)));
+      m_float_emit->STR(128, IndexType::Unsigned, flush_reg, PPC_REG, u32(PPCSTATE_OFF_PS0(preg)));
       break;
     case RegType::DuplicatedSingle:
       flush_reg = GetReg();
@@ -553,8 +567,7 @@ ARM64Reg Arm64FPRCache::RW(size_t preg, RegType type)
       [[fallthrough]];
     case RegType::Duplicated:
       // Store PSR1 (which is equal to PSR0) in memory.
-      m_float_emit->STR(64, IndexType::Unsigned, flush_reg, PPC_REG,
-                        u32(PPCSTATE_OFF(ps[preg].ps1)));
+      m_float_emit->STR(64, IndexType::Unsigned, flush_reg, PPC_REG, u32(PPCSTATE_OFF_PS1(preg)));
       break;
     default:
       // All other types doesn't store anything in PSR1.
@@ -682,7 +695,7 @@ void Arm64FPRCache::FlushRegister(size_t preg, bool maintain_state)
     if (dirty)
     {
       m_float_emit->STR(store_size, IndexType::Unsigned, host_reg, PPC_REG,
-                        u32(PPCSTATE_OFF(ps[preg].ps0)));
+                        u32(PPCSTATE_OFF_PS0(preg)));
     }
 
     if (!maintain_state)
@@ -695,14 +708,16 @@ void Arm64FPRCache::FlushRegister(size_t preg, bool maintain_state)
   {
     if (dirty)
     {
-      // If the paired registers were at the start of ppcState we could do an STP here.
-      // Too bad moving them would break savestate compatibility between x86_64 and AArch64
-      // m_float_emit->STP(64, IndexType::Signed, host_reg, host_reg, PPC_REG,
-      // PPCSTATE_OFF(ps[preg].ps0));
-      m_float_emit->STR(64, IndexType::Unsigned, host_reg, PPC_REG,
-                        u32(PPCSTATE_OFF(ps[preg].ps0)));
-      m_float_emit->STR(64, IndexType::Unsigned, host_reg, PPC_REG,
-                        u32(PPCSTATE_OFF(ps[preg].ps1)));
+      if (PPCSTATE_OFF_PS0(preg) <= 504)
+      {
+        m_float_emit->STP(64, IndexType::Signed, host_reg, host_reg, PPC_REG,
+                          PPCSTATE_OFF_PS0(preg));
+      }
+      else
+      {
+        m_float_emit->STR(64, IndexType::Unsigned, host_reg, PPC_REG, u32(PPCSTATE_OFF_PS0(preg)));
+        m_float_emit->STR(64, IndexType::Unsigned, host_reg, PPC_REG, u32(PPCSTATE_OFF_PS1(preg)));
+      }
     }
 
     if (!maintain_state)

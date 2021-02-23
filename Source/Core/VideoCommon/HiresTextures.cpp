@@ -18,10 +18,10 @@
 #include <fmt/format.h>
 
 #include "Common/CommonPaths.h"
-#include "Common/File.h"
 #include "Common/FileSearch.h"
 #include "Common/FileUtil.h"
 #include "Common/Flag.h"
+#include "Common/IOFile.h"
 #include "Common/Image.h"
 #include "Common/Logging/Log.h"
 #include "Common/MemoryUtil.h"
@@ -56,14 +56,7 @@ void HiresTexture::Init()
 
 void HiresTexture::Shutdown()
 {
-  if (s_prefetcher.joinable())
-  {
-    s_textureCacheAbortLoading.Set();
-    s_prefetcher.join();
-  }
-
-  s_textureMap.clear();
-  s_textureCache.clear();
+  Clear();
 }
 
 void HiresTexture::Update()
@@ -147,6 +140,11 @@ void HiresTexture::Update()
 
 void HiresTexture::Clear()
 {
+  if (s_prefetcher.joinable())
+  {
+    s_textureCacheAbortLoading.Set();
+    s_prefetcher.join();
+  }
   s_textureMap.clear();
   s_textureCache.clear();
 }

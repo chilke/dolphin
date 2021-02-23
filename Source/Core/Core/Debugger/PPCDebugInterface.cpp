@@ -13,6 +13,7 @@
 #include "Common/Align.h"
 #include "Common/GekkoDisassembler.h"
 
+#include "Core/Config/MainSettings.h"
 #include "Core/Core.h"
 #include "Core/Debugger/OSThread.h"
 #include "Core/HW/DSP.h"
@@ -383,10 +384,42 @@ void PPCDebugInterface::RunToBreakpoint()
 {
 }
 
+std::shared_ptr<Core::NetworkCaptureLogger> PPCDebugInterface::NetworkLogger()
+{
+  const bool has_ssl = Config::Get(Config::MAIN_NETWORK_SSL_DUMP_READ) ||
+                       Config::Get(Config::MAIN_NETWORK_SSL_DUMP_WRITE);
+  const bool is_pcap = Config::Get(Config::MAIN_NETWORK_DUMP_AS_PCAP);
+  const auto current_capture_type = [&] {
+    if (is_pcap)
+      return Core::NetworkCaptureType::PCAP;
+    if (has_ssl)
+      return Core::NetworkCaptureType::Raw;
+    return Core::NetworkCaptureType::None;
+  }();
+
+  if (m_network_logger && m_network_logger->GetCaptureType() == current_capture_type)
+    return m_network_logger;
+
+  switch (current_capture_type)
+  {
+  case Core::NetworkCaptureType::PCAP:
+    m_network_logger = std::make_shared<Core::PCAPSSLCaptureLogger>();
+    break;
+  case Core::NetworkCaptureType::Raw:
+    m_network_logger = std::make_shared<Core::BinarySSLCaptureLogger>();
+    break;
+  case Core::NetworkCaptureType::None:
+    m_network_logger = std::make_shared<Core::DummyNetworkCaptureLogger>();
+    break;
+  }
+  return m_network_logger;
+}
+
 void PPCDebugInterface::Clear()
 {
   ClearAllBreakpoints();
   ClearAllMemChecks();
   ClearPatches();
   ClearWatches();
+  m_network_logger.reset();
 }

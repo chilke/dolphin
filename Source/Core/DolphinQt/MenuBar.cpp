@@ -7,6 +7,7 @@
 #include <cinttypes>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFontDialog>
@@ -1021,7 +1022,7 @@ void MenuBar::UpdateToolsMenu(bool emulation_started)
   }
 
   const auto ios = IOS::HLE::GetIOS();
-  const auto bt = ios ? std::static_pointer_cast<IOS::HLE::Device::BluetoothEmu>(
+  const auto bt = ios ? std::static_pointer_cast<IOS::HLE::BluetoothEmuDevice>(
                             ios->GetDeviceByName("/dev/usb/oh1/57e/305")) :
                         nullptr;
   const bool enable_wiimotes =
