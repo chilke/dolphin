@@ -572,6 +572,10 @@ void MainWindow::ConnectHotkeys()
           &MainWindow::StateSaveSlot);
   connect(m_hotkey_scheduler, &HotkeyScheduler::SetStateSlotHotkey, this,
           &MainWindow::SetStateSlot);
+  connect(m_hotkey_scheduler, &HotkeyScheduler::StateIncSlot, this,
+          &MainWindow::StateIncSlot);
+  connect(m_hotkey_scheduler, &HotkeyScheduler::StateDecSlot, this,
+          &MainWindow::StateDecSlot);
   connect(m_hotkey_scheduler, &HotkeyScheduler::StartRecording, this,
           &MainWindow::OnStartRecording);
   connect(m_hotkey_scheduler, &HotkeyScheduler::ExportRecording, this,
@@ -1283,6 +1287,30 @@ void MainWindow::SetStateSlot(int slot)
   Core::DisplayMessage(StringFromFormat("Selected slot %d - %s", m_state_slot,
                                         State::GetInfoStringOfSlot(m_state_slot, false).c_str()),
                        2500);
+}
+
+void MainWindow::StateIncSlot()
+{
+  if (m_state_slot == State::NUM_STATES)
+  {
+    SetStateSlot(1);
+  }
+  else
+  {
+    SetStateSlot(m_state_slot+1);
+  }
+}
+
+void MainWindow::StateDecSlot()
+{
+  if (m_state_slot == 1)
+  {
+    SetStateSlot(State::NUM_STATES);
+  }
+  else
+  {
+    SetStateSlot(m_state_slot-1);
+  }
 }
 
 void MainWindow::PerformOnlineUpdate(const std::string& region)

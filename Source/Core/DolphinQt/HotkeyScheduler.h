@@ -43,6 +43,8 @@ signals:
   void StateSaveOldest();
   void StateLoadFile();
   void StateSaveFile();
+  void StateIncSlot();
+  void StateDecSlot();
   void StateLoadUndo();
   void StateSaveUndo();
   void StartRecording();
